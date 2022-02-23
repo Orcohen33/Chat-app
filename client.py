@@ -14,6 +14,25 @@ DISCONNECT_MESSAGE = "!DISCONNECT"
 
 
 # ---------------------------- model -------------------------------------
+class Functions:
+
+    def login(self):
+        pass
+
+    def userName(self):
+        pass
+
+    def address(self):
+        pass
+
+    def showOnline(self):
+        pass
+
+    def clearMessages(self):
+        pass
+
+    def showServerFiles(self):
+        pass
 
 # ---------------------------- view --------------------------------------
 
@@ -117,7 +136,7 @@ class InputField:
 class ViewController:
 
     def __init__(self):
-        self.screen = pg.display.set_mode((800, 600))                               # set screen
+        self.screen = pg.display.set_mode((800, 700))                               # set screen
         pg.display.set_caption("Chat application")                                  # title
         self.colors = {  # set colors
             "background": (110, 207, 95),
@@ -158,9 +177,14 @@ class ViewController:
             onColor=self.colors['white'],
             offColor=self.colors['dark-green']
         )
+        self.showServerFiles = Button(                                              # show server files button
+            panel=Rectangle((10, 65), (150, 50)),
+            text=Label("Show server files", self.font),
+            onColor=self.colors['white'],
+            offColor=self.colors['dark-green']
+        )
 
-
-
+        self.messageRect = Rectangle((10, 120), (780, 400))                         # message window
 
     def drawScreen(self):
         self.screen.fill(self.colors["background"])                                             # Draw background
@@ -174,6 +198,9 @@ class ViewController:
 
         self.showOnlineButton.draw(self.screen)                                                 # Draw showOnlineButton
         self.clearButton.draw(self.screen)                                                      # Draw clearButton
+        self.showServerFiles.draw(self.screen)                                               # Draw showServerFiles Butt
+
+        self.messageRect.draw(self.screen, self.colors['white'])                                # Draw message screen
         pg.display.update()
 
 
@@ -182,6 +209,8 @@ class ViewController:
 class Client:
     def __init__(self):
         pg.init()
+
+        self.fn = Functions()
         self.font = pg.font.SysFont("Arial", 24)
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -191,7 +220,7 @@ class Client:
     # TODO: Finish this constructor
 
     def run(self):
-        # server = socket.socket.connect(ADDR)
+        server = socket.socket.connect(ADDR)
 
         running = True
         while running:
@@ -207,7 +236,8 @@ class Client:
                     self.viewController.addrField.handleMousePress(event)                   # addrField
                     self.viewController.showOnlineButton.handleMousePress()                 # showOnline button
                     self.viewController.clearButton.handleMousePress()                      # clear button
-                    # TODO: Add login pressed "handleMousePress"
+                    self.viewController.showServerFiles.handleMousePress()                  # showServerFiles button
+
                 elif event.type == pg.KEYDOWN:
                     """This condition checks if any input field has been used"""
                     self.viewController.userNameField.handleKeyPress(event)
