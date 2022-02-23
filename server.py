@@ -50,7 +50,7 @@ class Rectangle:
         pg.draw.rect(surface, color, self.rect)
 
 
-class Buttom:
+class Button:
     def __init__(self, panel, text, onColor, offColor):
         self.panel = panel
         self.text = text
@@ -79,9 +79,9 @@ class ViewController:
 
     # TODO: Fix colors
     def __init__(self):
-        self.screen = pg.display.set_mode((800, 600))  # set screen
+        self.screen = pg.display.set_mode((800, 600))                                   # set screen
         pg.display.set_caption("Server controller")
-        self.colors = {  # set colors
+        self.colors = {                                                                 # set colors
             "background": (110, 207, 95),
             "clientRect": (188, 240, 180),
             "white": (255, 255, 255),
@@ -89,16 +89,16 @@ class ViewController:
             "dark-green": (49, 150, 33),
             "black": (0, 0, 0)
         }
-        self.font = pg.font.SysFont("Arial", 24)  # set font
-        self.clientRect = Rectangle((80, 80), (650, 500))  # init rectangle contains online clients
+        self.font = pg.font.SysFont("Arial", 24)                                        # set font
+        self.clientRect = Rectangle((80, 80), (650, 500))                       # init rectangle contains online clients
 
-        self.startButtom = Buttom(  # set start server buttom
+        self.startButton = Button(                                                      # set start server button
             panel=Rectangle((170, 20), (140, 40)),
             text=Label("Start server", self.font),
             onColor=self.colors['white'],
             offColor=self.colors['dark-green']
         )
-        self.exitButtom = Buttom(  # set exit and turn off the server buttom
+        self.exitButton = Button(  # set exit and turn off the server button
             panel=Rectangle((370, 20), (170, 40)),
             text=Label("Exit server", self.font),
             onColor=self.colors['white'],
@@ -110,7 +110,7 @@ class ViewController:
     def drawScreen(self, clientList):
         self.screen.fill(self.colors["background"])
         self.clientRect.draw(self.screen, self.colors["clientRect"])
-        self.startButtom.draw(self.screen)
+        self.startButton.draw(self.screen)
 
         # Draw the active clients
         client = clientList.clients
@@ -120,7 +120,7 @@ class ViewController:
             self.clientLabel.draw(self.screen, 100, y + 25, self.colors['black'])
             y += 50
 
-        self.exitButtom.draw(self.screen)
+        self.exitButton.draw(self.screen)
         pg.display.update()
 
 
@@ -140,7 +140,6 @@ class Server:
 
     def run(self):
         """The main function that connect between the server and all the clients"""
-        clock = pg.time.Clock()
         self.server.listen()
         inputs = [self.server]
         outputs = []
@@ -153,7 +152,7 @@ class Server:
                 if event.type == pg.QUIT:
                     running = False
                 elif event.type == pg.MOUSEBUTTONDOWN:
-                    running = not self.viewController.exitButtom.hasMosue()
+                    running = not self.viewController.exitButton.hasMosue()
 
             readable, writeable, exceptional = select.select(inputs, outputs, inputs, 0.1)
             for s in readable:
@@ -164,37 +163,41 @@ class Server:
                     inputs.append(conn)
                     self.clientList.add(f"Client{clientNumber}")
                     clientNumber += 1
-
-
+                else:
+                    # Client connection
+                    message = s.recv(1024).decode()
+                    if message:
+                        print(f"Got message \"{message}\"\n")
+                # TODO: Finish receive messages from clients
 
             self.viewController.drawScreen(self.clientList)  # Update the viewController
 
     # TODO: Fix the problem to get connections into the server
 
-    def handle_client(self, conn, addr):
-        print(f"[NEW CONNECTION] {addr} connected")
-
-        connected = True
-        while connected:
-            msg_length = conn.recv(64).decode(FORMAT)
-            if msg_length:
-                msg_length = int(msg_length)
-                msg = conn.recv(msg_length).decode(FORMAT)
-                if msg == DISCONNECT_MESSAGE:
-                    connected = False
-                conn.send("MASSAGE RECEIVED".encode(FORMAT))
-                print(f"[{addr}]: {msg}")
-
-        conn.close()
-
-    def start_server(self):
-
-        running = True
-        while running:
-            conn, addr = self.server.accept()
-            thread = threading.Thread(target=self.handle_client, args=(conn, addr))
-            thread.start()
-            print(f"\n[ACTIVE CONNECTION] {threading.active_count() - 1}")
+    # def handle_client(self, conn, addr):
+    #     print(f"[NEW CONNECTION] {addr} connected")
+    #
+    #     connected = True
+    #     while connected:
+    #         msg_length = conn.recv(64).decode(FORMAT)
+    #         if msg_length:
+    #             msg_length = int(msg_length)
+    #             msg = conn.recv(msg_length).decode(FORMAT)
+    #             if msg == DISCONNECT_MESSAGE:
+    #                 connected = False
+    #             conn.send("MASSAGE RECEIVED".encode(FORMAT))
+    #             print(f"[{addr}]: {msg}")
+    #
+    #     conn.close()
+    #
+    # def start_server(self):
+    #
+    #     running = True
+    #     while running:
+    #         conn, addr = self.server.accept()
+    #         thread = threading.Thread(target=self.handle_client, args=(conn, addr))
+    #         thread.start()
+    #         print(f"\n[ACTIVE CONNECTION] {threading.active_count() - 1}")
 
     def exit(self):
         pass
