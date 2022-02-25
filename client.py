@@ -39,7 +39,7 @@ class MessageList:
 def handle_send_calls(viewController, controller, call):
     if call == "Login":
         if not controller.connected:
-            if viewController.addrField.text.text == 'localhost':
+            if viewController.addrField.text.text == 'localhost'or viewController.addrField.text.text == '':
                 try:
                     controller.socket.connect(ADDR)
                     controller.connected = True
@@ -56,11 +56,11 @@ def handle_send_calls(viewController, controller, call):
 
         controller.name = viewController.userNameField.text.text
         if controller.connected:
-            controller.socket.send(f"{controller.socket}: name: {controller.name}".encode())
+            controller.socket.sendall(f"{controller.socket}: name: {controller.name}".encode())
 
     if controller.connected:
         if call == "Show online":
-            controller.socket.send(f"{controller.socket}: get_users".encode())
+            controller.socket.sendall(f"{controller.socket}: get_users".encode())
 
         elif call == "Clear":
             # work well
@@ -70,18 +70,18 @@ def handle_send_calls(viewController, controller, call):
             messageTo = viewController.messageToField.text.text
             message = viewController.messageField.text.text
             if viewController.messageToField.text.text == "":
-                controller.socket.send(f"{controller.socket}: set_msg_all: {controller.name}: {message}".encode())
+                controller.socket.sendall(f"{controller.socket}: set_msg_all: {controller.name}: {message}".encode())
                 print(f"set_msg_all: {viewController.messageField.text.text}")
 
             else:
-                controller.socket.send(f"{controller.socket}: set_msg: {controller.name}: {messageTo}: {message}".encode())
+                controller.socket.sendall(f"{controller.socket}: set_msg: {controller.name}: {messageTo}: {message}".encode())
                 controller.messageList.add(f"[TO] {messageTo}", message)
                 print(f"set_msg: {viewController.messageField.text.text}")
 
         elif call == 'Show server files':
-            controller.socket.send(f"{controller.socket}: get_list_file".encode())
+            controller.socket.sendall(f"{controller.socket}: get_list_file".encode())
         elif call == 'Disconnect':
-            controller.socket.send(f"{controller.socket}: disconnect".encode())
+            controller.socket.sendall(f"{controller.socket}: disconnect".encode())
             print("--------------- TEST ----------------")
             pass
 
@@ -178,7 +178,7 @@ class InputField:
         self.panel = panel
         self.ready = False
         self.active = False
-        self.flag = False
+        self.firstTimeClicked = True
 
     def hasMouse(self):
         return self.panel.hasMouse()
@@ -188,9 +188,15 @@ class InputField:
             if event.key == pg.K_RETURN:
                 self.ready = True
                 print(f"name : {self.text.text}")  # Test
-                # TODO : Fix this "Enter" pressed action
-                if controller.connected and self.text.text != '':
+                # TODO : Fix this "Enter" pressed action -(Fixed but needs more)
+                if controller.connected and self.text.text != '' and controller.viewController.messageField.active:
+                    '''When pressed enter in "messageField" it send the message to server and reset the field'''
                     handle_send_calls(controller.viewController, controller, "Send")
+                    controller.viewController.messageField.text.text = ''
+                elif controller.viewController.messageToField.active:
+                    '''When pressed enter in "messageToField" - moved to "messageField"'''
+                    controller.viewController.messageToField.active = False
+                    controller.viewController.messageField.active = True
 
             elif event.key == pg.K_BACKSPACE:
                 self.text.text = self.text.text[:-1]
@@ -203,7 +209,9 @@ class InputField:
     def handleMousePress(self, controller):
         if self.hasMouse():
             self.active = True
-            # print("clicked")
+            if self.firstTimeClicked:
+                self.text.text = ''
+                self.firstTimeClicked = False
         else:
             self.active = False
 
