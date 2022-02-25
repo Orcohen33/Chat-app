@@ -31,49 +31,69 @@ class MessageList:
         newMessage = Message(name, message)
         self.messages.append(newMessage)
 
-
 # STATIC METHODE
 def handle_send_calls(viewController, controller, call):
     if call == "Login":
-        try:
+        if controller.connected == False:
             if viewController.addrField.text.text == 'localhost':
                 controller.socket.connect(ADDR)
             else :
                 controller.socket.connect((viewController.addrField.text.text, PORT))
             controller.connected = True
-        except:
-            pass
         controller.name = viewController.userNameField.text.text
         try:
-            controller.socket.send(f"{controller.socket}: username: {controller.name}".encode())
+            controller.socket.send(f"{controller.socket}: name: {controller.name}".encode())
         except:
             print("Cant send data to server")
-    if call == "Show online":
-        if controller.connected:
-                controller.socket.send(f"{controller.socket}: showonline".encode())
 
-    elif call == "Clear":
-        # work well
-        controller.messageList.messages = []
+    if controller.connected:
+        if call == "Show online":
+                controller.socket.send(f"{controller.socket}: get_users".encode())
 
-    elif call == "Send":
-        if controller.connected:
-            controller.socket.send(f"{controller.socket}: send".encode())
-        print("[TO SERVER] send")
-        pass
+        elif call == "Clear":
+            # work well
+            controller.messageList.messages = []
+
+        elif call == "Send":
+            messageTo = viewController.messageToField.text.text
+            message = viewController.messageField.text.text
+            if viewController.messageToField.text.text == "":
+                controller.socket.send(f"{controller.socket}: set_msg_all: {controller.name}: {message}".encode())
+                print(f"set_msg_all: {viewController.messageField.text.text}")
+
+            else:
+                #TODO : Finish this
+                controller.socket.send(f"{controller.socket}: set_msg: {controller.name}: {messageTo}: {message}".encode())
+                print(f"set_msg: {viewController.messageField.text.text}")
+
+        elif call == 'Show server files':
+            controller.socket.send(f"{controller.socket}: get_list_file".encode())
+        elif call == 'Disconnect':
+            controller.socket.send(f"{controller.socket}: disconnect".encode())
+            print("--------------- TEST ----------------")
+            pass
 
 
 def handle_recive_call(viewController, controller, call):
-    if "online list" in call:
-        splitted = call.split(", ")
-        controller.messageList.add("", splitted[0])
+    splitted = call.split(": ")
+    if splitted[0] == 'name':
+        controller.messageList.add("", "This name is taken, please enter other username and press login again")
+        controller.name = splitted[1]
+        print(splitted)
+        pass
+    if splitted[0] == 'get_list_file' or splitted[0] == 'get_users':
         controller.messageList.add("", splitted[1])
         controller.messageList.add("", splitted[2])
-        print("-----------------------WORK--------------------\n"
-              f"{call}")
+        controller.messageList.add("", splitted[3])
         print(splitted)
+        pass
+    if splitted[0] == 'set_msg':
+        controller.messageList.add(splitted[1], splitted[2])
+        pass
+    if splitted[0] == 'set_msg_all':
+        controller.messageList.add(splitted[1], splitted[2])
+        pass
     pass
-
 # ---------------------------- view --------------------------------------
 
 
@@ -343,9 +363,23 @@ class Client:
         running = True
         while running:
 
+            readable, writable, exceptional = select.select(inputs, outputs, inputs, 0.1)
+            for s in readable:
+                if s is self.socket and self.connected:
+                    msgs = s.recv(2048).decode()
+                    message = Message("", msgs)
+                    handle_recive_call(self.viewController, self, msgs)
+                    # self.messageList.messages.append(message)
+                    print(f"[FROM SERVER] - "+msgs)
+
+
             # Events for pygame
             for event in pg.event.get():
                 if event.type == pg.QUIT:
+                    if self.connected:
+                        handle_send_calls(self.viewController, self, 'Disconnect')
+                        self.socket.close()
+                        self.connected = False
                     running = False
                 elif event.type == pg.MOUSEBUTTONDOWN:
                     """This condition checks if any component has been clicked"""
@@ -375,15 +409,6 @@ class Client:
                     self.viewController.serverFileNameField.handleKeyPress(event)
                     self.viewController.clientFileNameField.handleKeyPress(event)
 
-            readable, writable, exceptional = select.select(inputs, outputs, inputs, 0.1)
-            for s in readable:
-                if s is self.socket:
-                    msgs = s.recv(1024).decode()
-                    message = Message("", msgs)
-                    handle_recive_call(self.viewController, self, msgs)
-                    self.messageList.messages.append(message)
-                    print(f"[RECIVED] :"+msgs)
-
             self.viewController.drawScreen(self.messageList.messages)                                                # Update the viewController
 
     def exit(self):
@@ -396,6 +421,8 @@ if __name__ == '__main__':
     client = Client()
     client.run()
     client.exit()
+
+
 
 
 

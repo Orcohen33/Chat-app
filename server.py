@@ -20,8 +20,8 @@ class Client:
     def __init__(self, name, conn):
         self.name = name
         self.conn = conn
-        ipAddr, port = str(conn)[126:145].split(", ")
-        self.address = (ipAddr, int(port))
+        # ipAddr, port = str(conn)[126:145].split(", ")
+        # self.address = (ipAddr, int(port))
 
 
 class ClientList:
@@ -39,9 +39,16 @@ class ClientList:
             return self.clients[conn]
         return None
 
+    def getConnByName(self, name):
+        for client in self.clients.values():
+            if name in client.name:
+                return client.conn
+        return None
+
     def nameExists(self, name):
         for client in self.clients.values():
             if name in client.name:
+                print("--- TRUE ---")
                 return True
         return False
 
@@ -49,32 +56,68 @@ class ClientList:
         return self.clients[conn] is not None
 
 
-def handle_call(self, message, conn, addr):
+class File:
+    def __init__(self, name, size):
+        self.name = name
+        self.size = size
+    pass
+
+
+class FileList:
+    def __init__(self):
+        self.fileList = {}
+
+    def add(self, name, size):
+        self.fileList[name] = size
+
+
+def handle_call(self, message, conn, inputs):
     """Static methode"""
     details = message.split(": ")
-    if details[1] == 'username':
+    if details[1] == 'name':
         if not self.clientList.nameExists(details[2]):
             client = self.clientList.getByConn(conn)
             client.name = details[2]
             self.clientList.clients[conn] = client
-    if details[1] == 'showonline':
-        onlineMembers = "--- online list ---, "
+        else :
+            conn.send(f"name: client{self.clientNumber}".encode())
+            pass
+    # Get calls
+    elif details[1] == 'get_users':
+        onlineMembers = "get_users: --- start list ---: "
         for client in self.clientList.clients.values():
             onlineMembers += f"{client.name},"
-        onlineMembers += ", --- online list ---"
+        onlineMembers += ": --- end list ---"
         conn.send(onlineMembers.encode())
-    if details[1] == 'send':
-        conn.send("[SERVER]: send".encode())
-        # conn.send(f"--- online list ---".encode())
-        # onlineMembers = ""
-        # for client in self.clientList.clients.values():
-        #     onlineMembers += f"{client.name},"
-        # conn.send(onlineMembers.encode())
-        # conn.send(f"--- end list ---".encode())
-        # client = self.clientList.getByConn(conn)
-        # conn.send(onlineMembers.encode())
-    pass
+    elif details[1] == 'get_list_file':
+        fileList = "get_list_file: --- Server File List ---: "
+        fileList += f"{self.fileList.fileList},"
+        fileList += ": --- End Server File List ---"
+        conn.send(fileList.encode())
+    # Set calls
 
+    elif details[1] == 'set_msg':
+        clientConn = self.clientList.getConnByName(f"{details[3]}")
+        if clientConn is not None:
+            clientConn.send(f"set_msg: {details[2]}: {details[4]}".encode())
+        pass
+    elif details[1] == 'set_msg_all':
+        if len(details) > 2:
+            # Send message to all online clients
+            print(f"\n{details}\n")
+            for sock in inputs[1:]:
+                sock.send(f"set_msg_all: {details[2]}: {details[3]} ".encode())
+        pass
+    # Disconnect
+    elif details[1] == 'disconnect':
+        print(inputs)
+        for k, v in enumerate(inputs):
+            if conn == v:
+                del inputs[k]
+        print(inputs)
+        del self.clientList.clients[conn]
+        self.clientNumber -= 1
+        pass
 # ---------------------------- view --------------------------------------
 
 
@@ -130,7 +173,7 @@ class ViewController:
     # TODO: Fix colors
     def __init__(self):
         self.screen = pg.display.set_mode((800, 600))                                   # set screen
-        pg.display.set_caption("Server controller")
+        pg.display.set_caption("Server controller")                                     # set title
         self.colors = {                                                                 # set colors
             "background": (110, 207, 95),
             "clientRect": (188, 240, 180),
@@ -140,8 +183,8 @@ class ViewController:
             "black": (0, 0, 0)
         }
         self.font = pg.font.SysFont("Arial", 24)                                        # set font
-        self.clientRect = Rectangle((80, 80), (650, 500))                       # init rectangle contains online clients
 
+        # Buttons
         self.startButton = Button(                                                      # set start server button
             panel=Rectangle((170, 20), (140, 50)),
             text=Label("Start server", self.font),
@@ -155,18 +198,24 @@ class ViewController:
             offColor=self.colors['dark-green']
         )
 
+        # Labels
         self.clientLabel = Label("", self.font)
+        # clientOnline rect
+        self.clientRect = Rectangle((80, 80), (650, 500))                       # init rectangle contains online clients
 
-    def drawScreen(self, clientList):
+    def drawScreen(self, clientList, controller):
         self.screen.fill(self.colors["background"])
         self.clientRect.draw(self.screen, self.colors["clientRect"])
         self.startButton.draw(self.screen)
 
         # Draw the active clients
         client = clientList.clients.values()
+        if controller.flag:
+            serverDetails = Label(f"Server IP: {socket.gethostbyname(socket.gethostname())}", self.font)
+            serverDetails.draw(self.screen, 280, 70, self.colors['black'])
         y = 90
         for value in client:
-            self.clientLabel.text = value.name
+            self.clientLabel.text = f"{value.name}"
             self.clientLabel.draw(self.screen, 100, y + 25, self.colors['black'])
             y += 50
 
@@ -181,9 +230,11 @@ class Server:
         pg.init()
         self.viewController = ViewController()
         self.clientList = ClientList()
+        self.fileList = FileList()
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind(ADDR)
         self.flag = False
+        self.clientNumber = 0
 
         print("[STARTING] server is starting...")
         print(f"[LISTENING] Server is listening on {ADDR}")
@@ -195,7 +246,6 @@ class Server:
         self.server.listen()
         inputs = [self.server]
         outputs = []
-        clientNumber = 0
         running = True
         while running:
 
@@ -216,65 +266,24 @@ class Server:
                         conn, addr = s.accept()
                         conn.setblocking(0)
                         inputs.append(conn)
-                        self.clientList.add(f"Client{clientNumber}", conn)
-                        clientNumber += 1
+                        self.clientList.add(f"client{self.clientNumber}", conn)
+                        self.clientNumber += 1
                     else:
                         # Client connection
-                        message = s.recv(1024).decode()
-                        if message:
-                            addr = self.addrOfConnection(s)
-                            handle_call(self=self, message=message, conn=s , addr=addr)
-                            # if message == "!DISCONNECT":
-                            #     # TODO: FIX IT (KEEP IT SIMPLE)
-                            #     if self.clientList.clients[s] is not None:
-                            #         s.send("Disconnecting".encode())
-                            #         print(inputs.remove(s))
-                            #         print(inputs)
-                            #         del self.clientList.clients[s]
-                            #         clientNumber -= 1
-                            # else:
-                            print(f"[CLIENT] Got message \"{message.split(': ')[1]}\"\n")
+                        if s:
+                            message = s.recv(1024).decode()
+                            if message:
+                                handle_call(self=self, message=message, conn=s, inputs=inputs)
+                                print(f"[ONLINE]: {len(self.clientList.clients)}")
+                                print(f"[ONLINE]: {[client.name for client in self.clientList.clients.values()]}")
+                                print(f"[RECEIVED] {message.split(': ')[1:]}")
 
-                            # client = self.clientList.getByConn(s)
-                            # client.name = message.split(': ')[2]
-                            # self.clientList.clients[s] = client
-                            # self.clientList.clients[client.conn].name = message
-                            print(message)
-                            print(f"From :{addr}")
-                            # s.send("GOT MESSAGE".encode())
-
-
-
-                    # TODO: Finish receive messages from clients
-
-            self.viewController.drawScreen(self.clientList)  # Update the viewController
-
-    # TODO: handle all calls from client
-
-    def addrOfConnection(self, s):
-        output = str(s)
-        output = output.replace("<", '')
-        output = output.replace(">", '')
-        output = output.split(", ")
-        addr = output[6][6:].replace("(", '')
-        port = int(output[7].replace(")", ''))
-        fullAddr = addr, port
-        return fullAddr
-
+            self.viewController.drawScreen(self.clientList, self)  # Update the viewController
 
     def exit(self):
         pass
-
-
-
-
 # ------------------------------------------------------------------------
-
 if __name__ == '__main__':
     server = Server()
     server.run()
     server.exit()
-
-
-
-# raddr = st[126:146]
