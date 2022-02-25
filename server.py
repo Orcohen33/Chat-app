@@ -4,10 +4,13 @@ import socket
 import threading
 import select
 import time
+from os import listdir
+from os.path import isfile, join
+
 
 # Constant variables
-# SERVER = socket.gethostbyname(socket.gethostname())
-SERVER = "127.0.0.1"
+SERVER = socket.gethostbyname(socket.gethostname())
+# SERVER = "127.0.0.1"
 PORT = 50000
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
@@ -65,7 +68,14 @@ class File:
 
 class FileList:
     def __init__(self):
-        self.fileList = {}
+        onlyfiles = [f for f in listdir('../ChatApp/') if isfile(join('../ChatApp/', f))]
+        index = 0
+        for file in onlyfiles:
+            if 'py' in file.split('.')[1]:
+                del onlyfiles[index]
+                continue
+            index += 1
+        self.fileList = onlyfiles
 
     def add(self, name, size):
         self.fileList[name] = size
@@ -110,11 +120,16 @@ def handle_call(self, message, conn, inputs):
         pass
     # Disconnect
     elif details[1] == 'disconnect':
+        print()
         print(inputs)
         for k, v in enumerate(inputs):
             if conn == v:
+                inputs[k].close()
                 del inputs[k]
+                print("[SYSTEM] Closed socket")
+                break
         print(inputs)
+        print()
         del self.clientList.clients[conn]
         self.clientNumber -= 1
         pass
@@ -235,9 +250,9 @@ class Server:
         self.server.bind(ADDR)
         self.flag = False
         self.clientNumber = 0
-
         print("[STARTING] server is starting...")
         print(f"[LISTENING] Server is listening on {ADDR}")
+        print(f"Files {self.fileList.fileList}")
 
     # TODO: Finish this constructor
 

@@ -1,5 +1,7 @@
 """Represented by MVC Design
 Or cohen"""
+import this
+
 import pygame as pg
 import socket
 import select
@@ -7,7 +9,7 @@ import time
 
 # Constant variables
 PORT = 50000
-SERVER = "127.0.0.1"
+SERVER = '127.0.0.1'
 FORMAT = 'utf-8'
 ADDR = (SERVER, PORT)
 DISCONNECT_MESSAGE = "!DISCONNECT"
@@ -32,23 +34,33 @@ class MessageList:
         self.messages.append(newMessage)
 
 # STATIC METHODE
+
+
 def handle_send_calls(viewController, controller, call):
     if call == "Login":
-        if controller.connected == False:
+        if not controller.connected:
             if viewController.addrField.text.text == 'localhost':
-                controller.socket.connect(ADDR)
+                try:
+                    controller.socket.connect(ADDR)
+                    controller.connected = True
+                except:
+                    controller.messageList.add('[SYSTEM]', 'Failed connection, try other IP Address')
+                    pass
             else :
-                controller.socket.connect((viewController.addrField.text.text, PORT))
-            controller.connected = True
+                try:
+                    controller.socket.connect((viewController.addrField.text.text, PORT))
+                    controller.connected = True
+                except:
+                    controller.messageList.add('[SYSTEM]', 'Failed connection, try other IP Address')
+                    pass
+
         controller.name = viewController.userNameField.text.text
-        try:
+        if controller.connected:
             controller.socket.send(f"{controller.socket}: name: {controller.name}".encode())
-        except:
-            print("Cant send data to server")
 
     if controller.connected:
         if call == "Show online":
-                controller.socket.send(f"{controller.socket}: get_users".encode())
+            controller.socket.send(f"{controller.socket}: get_users".encode())
 
         elif call == "Clear":
             # work well
@@ -62,8 +74,8 @@ def handle_send_calls(viewController, controller, call):
                 print(f"set_msg_all: {viewController.messageField.text.text}")
 
             else:
-                #TODO : Finish this
                 controller.socket.send(f"{controller.socket}: set_msg: {controller.name}: {messageTo}: {message}".encode())
+                controller.messageList.add(f"[TO] {messageTo}", message)
                 print(f"set_msg: {viewController.messageField.text.text}")
 
         elif call == 'Show server files':
@@ -74,7 +86,7 @@ def handle_send_calls(viewController, controller, call):
             pass
 
 
-def handle_recive_call(viewController, controller, call):
+def handle_receive_call(viewController, controller, call):
     splitted = call.split(": ")
     if splitted[0] == 'name':
         controller.messageList.add("", "This name is taken, please enter other username and press login again")
@@ -88,9 +100,11 @@ def handle_recive_call(viewController, controller, call):
         print(splitted)
         pass
     if splitted[0] == 'set_msg':
-        controller.messageList.add(splitted[1], splitted[2])
+        print(splitted)
+        controller.messageList.add(f"[FROM] {splitted[1]}", splitted[2])
         pass
     if splitted[0] == 'set_msg_all':
+        print(splitted)
         controller.messageList.add(splitted[1], splitted[2])
         pass
     pass
@@ -147,7 +161,7 @@ class Button:
             # controller.socket.send(f"{self.text.text}".encode())
             handle_send_calls(viewController, controller, self.text.text)
 
-    def draw(self, surface):
+    def draw(self, surface, viewController):
         panelColor = self.offColor
         textColor = self.onColor
         if self.hasMosue():
@@ -169,12 +183,14 @@ class InputField:
     def hasMouse(self):
         return self.panel.hasMouse()
 
-    def handleKeyPress(self, event):
+    def handleKeyPress(self, event, controller):
         if self.active:
             if event.key == pg.K_RETURN:
                 self.ready = True
-
                 print(f"name : {self.text.text}")  # Test
+                # TODO : Fix this "Enter" pressed action
+                if controller.connected and self.text.text != '':
+                    handle_send_calls(controller.viewController, controller, "Send")
 
             elif event.key == pg.K_BACKSPACE:
                 self.text.text = self.text.text[:-1]
@@ -304,12 +320,12 @@ class ViewController:
         self.screen.fill(self.colors["background"])                                             # Draw background
 
         # Buttons
-        self.loginButton.draw(self.screen)                                                      # Draw loginButton
-        self.showOnlineButton.draw(self.screen)                                                 # Draw showOnlineButton
-        self.clearButton.draw(self.screen)                                                      # Draw clearButton
-        self.showServerFilesButton.draw(self.screen)                                       # Draw showServerFiles Button
-        self.sendButton.draw(self.screen)                                                   # Draw send button
-        self.downloadButton.draw(self.screen)                                               # Draw download button
+        self.loginButton.draw(self.screen, viewController=self)                                                      # Draw loginButton
+        self.showOnlineButton.draw(self.screen, viewController=self)                                                 # Draw showOnlineButton
+        self.clearButton.draw(self.screen, viewController=self)                                                      # Draw clearButton
+        self.showServerFilesButton.draw(self.screen, viewController=self)                                       # Draw showServerFiles Button
+        self.sendButton.draw(self.screen, viewController=self)                                                   # Draw send button
+        self.downloadButton.draw(self.screen, viewController=self)                                               # Draw download button
 
         # Input fields
         self.userNameField.draw(self.screen, self.colors['dark-green'], self.colors['white'])   # Draw userNameInput
@@ -366,9 +382,9 @@ class Client:
             readable, writable, exceptional = select.select(inputs, outputs, inputs, 0.1)
             for s in readable:
                 if s is self.socket and self.connected:
-                    msgs = s.recv(2048).decode()
+                    msgs = s.recv(1024).decode()
                     message = Message("", msgs)
-                    handle_recive_call(self.viewController, self, msgs)
+                    handle_receive_call(self.viewController, self, msgs)
                     # self.messageList.messages.append(message)
                     print(f"[FROM SERVER] - "+msgs)
 
@@ -402,12 +418,12 @@ class Client:
 
                 elif event.type == pg.KEYDOWN:
                     """This condition checks if any input field has been used"""
-                    self.viewController.userNameField.handleKeyPress(event)
-                    self.viewController.addrField.handleKeyPress(event)
-                    self.viewController.messageToField.handleKeyPress(event)
-                    self.viewController.messageField.handleKeyPress(event)
-                    self.viewController.serverFileNameField.handleKeyPress(event)
-                    self.viewController.clientFileNameField.handleKeyPress(event)
+                    self.viewController.userNameField.handleKeyPress(event, self)
+                    self.viewController.addrField.handleKeyPress(event, self)
+                    self.viewController.messageToField.handleKeyPress(event, self)
+                    self.viewController.messageField.handleKeyPress(event, self)
+                    self.viewController.serverFileNameField.handleKeyPress(event, self)
+                    self.viewController.clientFileNameField.handleKeyPress(event, self)
 
             self.viewController.drawScreen(self.messageList.messages)                                                # Update the viewController
 
@@ -430,3 +446,6 @@ if __name__ == '__main__':
 # port = int(input("Connect on port: "))
 # s.connect(("192.168.1.242", port))
 # this = input("Press any key to exit:")
+
+
+# set_msg_all: or: hey
