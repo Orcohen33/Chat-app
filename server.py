@@ -75,7 +75,7 @@ class ClientList:
 
 class FileList:
     def __init__(self):
-        onlyfiles = {f: os.path.getsize(f) for f in listdir('../ChatApp/') if
+        onlyfiles = {f: os.path.getsize(f) for f in listdir('.') if
                      0 <= os.path.getsize(f) <= 64000 and '.py' not in f}
         self.fileList = onlyfiles
 
