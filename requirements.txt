@@ -1,0 +1,6 @@
+pygame
+socket
+select
+time
+math
+os
